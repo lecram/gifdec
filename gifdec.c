@@ -202,9 +202,40 @@ read_ext(GIF *gif)
 }
 
 void
+read_image_data(GIF *gif)
+{
+    uint8_t code_size;
+
+    read(gif->fd, &code_size, 1);
+    /* TODO: uncompress raster data. */
+    discard_sub_blocks(gif);
+}
+
+void
 read_image(GIF *gif)
 {
-    /* TODO */
+    uint16_t x, y, w, h;
+    uint8_t fisrz;
+    int interlace;
+
+    /* Image Descriptor. */
+    x = read_num(gif->fd);
+    y = read_num(gif->fd);
+    w = read_num(gif->fd);
+    h = read_num(gif->fd);
+    read(gif->fd, &fisrz, 1);
+    interlace = fisrz & 0x40;
+    /* Ignore Sort Flag. */
+    /* Local Color Table? */
+    if (fisrz & 0x80) {
+        /* Read LCT */
+        gif->lct.size = 1 << ((fisrz & 0x07) + 1);
+        read(gif->fd, gif->lct.colors, 3 * gif->lct.size);
+        gif->palette = &gif->lct;
+    } else
+        gif->palette = &gif->gct;
+    /* Image Data. */
+    read_image_data(gif);
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
@@ -229,13 +260,15 @@ get_frame(GIF *gif)
 int
 main()
 {
+    int nframes = 0;
     GIF *gif = open_gif("example.gif");
     if (gif) {
         printf("%ux%u\n", gif->width, gif->height);
         printf("%d colors\n", gif->palette->size);
-        get_frame(gif);
+        while (get_frame(gif)) nframes++;
         close(gif->fd);
         free(gif);
+        printf("%d frames\n", nframes);
     }
     return 0;
 }
