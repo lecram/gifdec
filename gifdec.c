@@ -204,9 +204,9 @@ read_ext(GIF *gif)
 void
 read_image_data(GIF *gif)
 {
-    uint8_t code_size;
+    uint8_t key_size;
 
-    read(gif->fd, &code_size, 1);
+    read(gif->fd, &key_size, 1);
     /* TODO: uncompress raster data. */
     discard_sub_blocks(gif);
 }
