@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 typedef struct Palette {
     int size;
@@ -32,6 +33,18 @@ typedef struct GIF {
     Palette lct, gct;
     uint8_t *frame;
 } GIF;
+
+typedef struct Entry {
+    uint16_t length;
+    uint16_t prefix;
+    uint8_t  suffix;
+} Entry;
+
+typedef struct Table {
+    int bulk;
+    int nentries;
+    Entry *entries;
+} Table;
 
 uint16_t
 read_num(int fd)
@@ -203,8 +216,24 @@ read_ext(GIF *gif)
     }
 }
 
+Table *
+new_table(int key_size)
+{
+    int key;
+    int init_bulk = MAX(1 << (key_size + 1), 0x100);
+    Table *table = malloc(sizeof(*table) + sizeof(Entry) * init_bulk);
+    if (table) {
+        table->bulk = init_bulk;
+        table->nentries = (1 << key_size) + 2;
+        table->entries = (Entry *) &table[1];
+        for (key = 0; key < (1 << key_size); key++)
+            table->entries[key] = (Entry) {1, 0xFFF, key};
+    }
+    return table;
+}
+
 uint16_t
-get_key(GIF *gif, int key_size, int *sub_len, uint8_t *byte)
+get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *byte)
 {
     int bits_read;
     int rpad;
@@ -215,13 +244,13 @@ get_key(GIF *gif, int key_size, int *sub_len, uint8_t *byte)
         rpad = bits_read % 8;
         if (rpad == 0) {
             /* Update byte. */
-            if (sub_len == 0)
+            if (*sub_len == 0)
                 read(gif->fd, sub_len, 1); /* Must be nonzero! */
             read(gif->fd, byte, 1);
             (*sub_len)--;
         }
         frag_size = MIN(key_size - bits_read, 8 - rpad);
-        key |= ((*byte) >> rpad) << bits_read;
+        key |= ((uint16_t) ((*byte) >> rpad)) << bits_read;
     }
     /* Clear extra bits to the left. */
     key &= (1 << key_size) - 1;
@@ -234,12 +263,19 @@ read_image_data(GIF *gif)
     uint8_t sub_len;
     uint8_t byte;
     int key_size;
-    uint16_t key;
+    uint16_t key, clear, stop;
+    Table *table;
 
     read(gif->fd, &byte, 1);
     key_size = (int) byte;
+    clear = 1 << key_size;
+    stop = clear + 1;
+    table = new_table(key_size);
+    key_size++;
     sub_len = 0;
     key = get_key(gif, key_size, &sub_len, &byte);
+    printf("%03X == %03X\n", key, clear);
+    exit(0);
 }
 
 void
