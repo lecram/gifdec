@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
+
 typedef struct Palette {
     int size;
     uint8_t colors[0x100 * 3];
@@ -201,14 +203,43 @@ read_ext(GIF *gif)
     }
 }
 
+uint16_t
+get_key(GIF *gif, int key_size, int *sub_len, uint8_t *byte)
+{
+    int bits_read;
+    int rpad;
+    int frag_size;
+    uint16_t key;
+
+    for (bits_read = 0; bits_read < key_size; bits_read += frag_size) {
+        rpad = bits_read % 8;
+        if (rpad == 0) {
+            /* Update byte. */
+            if (sub_len == 0)
+                read(gif->fd, sub_len, 1); /* Must be nonzero! */
+            read(gif->fd, byte, 1);
+            (*sub_len)--;
+        }
+        frag_size = MIN(key_size - bits_read, 8 - rpad);
+        key |= ((*byte) >> rpad) << bits_read;
+    }
+    /* Clear extra bits to the left. */
+    key &= (1 << key_size) - 1;
+    return key;
+}
+
 void
 read_image_data(GIF *gif)
 {
-    uint8_t key_size;
+    uint8_t sub_len;
+    uint8_t byte;
+    int key_size;
+    uint16_t key;
 
-    read(gif->fd, &key_size, 1);
-    /* TODO: uncompress raster data. */
-    discard_sub_blocks(gif);
+    read(gif->fd, &byte, 1);
+    key_size = (int) byte;
+    sub_len = 0;
+    key = get_key(gif, key_size, &sub_len, &byte);
 }
 
 void
