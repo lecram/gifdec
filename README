@@ -1,0 +1,35 @@
+GIF decoder
+===========
+
+This is a small C library that can be used to read GIF files.
+It's a work in progress...
+
+Features
+--------
+
+  * TODO
+
+
+Limitations
+-----------
+
+  * TODO
+
+
+Documentation
+-------------
+
+TODO
+
+
+Example
+-------
+
+TODO
+
+
+Copying
+-------
+
+All of the source code and documentation for gifdec is released into the
+public domain and provided without warranty of any kind.
