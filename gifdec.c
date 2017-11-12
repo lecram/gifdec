@@ -232,16 +232,36 @@ new_table(int key_size)
     return table;
 }
 
+/* Add table entry. Return value:
+ *  0 on success
+ *  +1 if key size must be incremented after this addition
+ *  -1 if could not realloc table */
+int
+add_entry(Table *table, uint16_t length, uint16_t prefix, uint8_t suffix)
+{
+    if (table->nentries == table->bulk) {
+        table->bulk *= 2;
+        table = realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
+        if (!table) return -1;
+    }
+    table->entries[table->nentries] = (Entry) {length, prefix, suffix};
+    table->nentries++;
+    if ((table->nentries & (table->nentries - 1)) == 0)
+        return 1;
+    return 0;
+}
+
 uint16_t
-get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *byte)
+get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
 {
     int bits_read;
     int rpad;
     int frag_size;
     uint16_t key;
 
+    key = 0;
     for (bits_read = 0; bits_read < key_size; bits_read += frag_size) {
-        rpad = bits_read % 8;
+        rpad = (*shift + bits_read) % 8;
         if (rpad == 0) {
             /* Update byte. */
             if (*sub_len == 0)
@@ -254,17 +274,20 @@ get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *byte)
     }
     /* Clear extra bits to the left. */
     key &= (1 << key_size) - 1;
+    *shift = (*shift + key_size) % 8;
     return key;
 }
 
 void
-read_image_data(GIF *gif)
+read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
-    uint8_t sub_len;
-    uint8_t byte;
+    uint8_t sub_len, shift, byte;
     int key_size;
+    int frm_off, str_len, p;
     uint16_t key, clear, stop;
+    int ret;
     Table *table;
+    Entry entry;
 
     read(gif->fd, &byte, 1);
     key_size = (int) byte;
@@ -272,10 +295,30 @@ read_image_data(GIF *gif)
     stop = clear + 1;
     table = new_table(key_size);
     key_size++;
-    sub_len = 0;
-    key = get_key(gif, key_size, &sub_len, &byte);
-    printf("%03X == %03X\n", key, clear);
-    exit(0);
+    sub_len = shift = 0;
+    key = get_key(gif, key_size, &sub_len, &shift, &byte); /* clear code */
+    frm_off = 0;
+    while (1) {
+        if (key != clear)
+            ret = add_entry(table, str_len + 1, key, entry.suffix);
+        key = get_key(gif, key_size, &sub_len, &shift, &byte);
+        if (key == stop) break;
+        if (ret == 1) key_size++;
+        entry = table->entries[key];
+        str_len = entry.length;
+        while (1) {
+            p = frm_off + entry.length - 1;
+            gif->frame[(y + p / w) * gif->width + x + p % w] = entry.suffix;
+            if (entry.prefix == 0xFFF)
+                break;
+            else
+                entry = table->entries[entry.prefix];
+        }
+        frm_off += str_len;
+        if (key < table->nentries - 1)
+            table->entries[table->nentries - 1].suffix = entry.suffix;
+    }
+    free(table);
 }
 
 void
@@ -302,7 +345,7 @@ read_image(GIF *gif)
     } else
         gif->palette = &gif->gct;
     /* Image Data. */
-    read_image_data(gif);
+    read_image_data(gif, x, y, w);
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
