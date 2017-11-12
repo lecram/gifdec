@@ -24,7 +24,7 @@ typedef struct Table {
     Entry *entries;
 } Table;
 
-uint16_t
+static uint16_t
 read_num(int fd)
 {
     uint8_t bytes[2];
@@ -97,7 +97,7 @@ ok:
     return gif;
 }
 
-void
+static void
 discard_sub_blocks(GIF *gif)
 {
     uint8_t size;
@@ -109,7 +109,7 @@ discard_sub_blocks(GIF *gif)
 }
 
 /* Ignored extension. */
-void
+static void
 read_plain_text_ext(GIF *gif)
 {
     fprintf(stderr, "ignoring plain text extension\n");
@@ -119,7 +119,7 @@ read_plain_text_ext(GIF *gif)
     discard_sub_blocks(gif);
 }
 
-void
+static void
 read_graphic_control_ext(GIF *gif)
 {
     uint8_t rdit;
@@ -137,7 +137,7 @@ read_graphic_control_ext(GIF *gif)
 }
 
 /* Ignored extension. */
-void
+static void
 read_comment_ext(GIF *gif)
 {
     fprintf(stderr, "ignoring comment extension\n");
@@ -145,7 +145,7 @@ read_comment_ext(GIF *gif)
     discard_sub_blocks(gif);
 }
 
-void
+static void
 read_application_ext(GIF *gif)
 {
     char app_id[8];
@@ -170,7 +170,7 @@ read_application_ext(GIF *gif)
     }
 }
 
-void
+static void
 read_ext(GIF *gif)
 {
     uint8_t label;
@@ -194,7 +194,7 @@ read_ext(GIF *gif)
     }
 }
 
-Table *
+static Table *
 new_table(int key_size)
 {
     int key;
@@ -214,7 +214,7 @@ new_table(int key_size)
  *  0 on success
  *  +1 if key size must be incremented after this addition
  *  -1 if could not realloc table */
-int
+static int
 add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
 {
     Table *table = *tablep;
@@ -232,7 +232,7 @@ add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
     return 0;
 }
 
-uint16_t
+static uint16_t
 get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
 {
     int bits_read;
@@ -261,7 +261,7 @@ get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
 
 /* Decompress image pixels.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
-int
+static int
 read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
     uint8_t sub_len, shift, byte;
@@ -313,7 +313,7 @@ read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 
 /* Read image.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
-int
+static int
 read_image(GIF *gif)
 {
     uint16_t x, y, w, h;
