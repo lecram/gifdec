@@ -1,6 +1,7 @@
+#include "gifdec.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 
 #include <sys/types.h>
@@ -10,29 +11,6 @@
 
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
-
-typedef struct Palette {
-    int size;
-    uint8_t colors[0x100 * 3];
-} Palette;
-
-typedef struct GCE {
-    uint16_t delay;
-    uint8_t tindex;
-    uint8_t disposal;
-    int input;
-    int transparency;
-} GCE;
-
-typedef struct GIF {
-    int fd;
-    uint16_t width, height;
-    uint16_t loop_count;
-    GCE gce;
-    Palette *palette;
-    Palette lct, gct;
-    uint8_t *frame;
-} GIF;
 
 typedef struct Entry {
     uint16_t length;
@@ -382,18 +360,9 @@ get_frame(GIF *gif)
     return 1;
 }
 
-int
-main()
+void
+close_gif(GIF *gif)
 {
-    int nframes = 0;
-    GIF *gif = open_gif("example.gif");
-    if (gif) {
-        printf("%ux%u\n", gif->width, gif->height);
-        printf("%d colors\n", gif->palette->size);
-        while (get_frame(gif)) nframes++;
-        close(gif->fd);
-        free(gif);
-        printf("%d frames\n", nframes);
-    }
-    return 0;
+    close(gif->fd);
+    free(gif);
 }
