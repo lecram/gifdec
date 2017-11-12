@@ -278,7 +278,9 @@ get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
     return key;
 }
 
-void
+/* Decompress image pixels.
+ * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
+int
 read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
     uint8_t sub_len, shift, byte;
@@ -298,9 +300,15 @@ read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
     sub_len = shift = 0;
     key = get_key(gif, key_size, &sub_len, &shift, &byte); /* clear code */
     frm_off = 0;
+    ret = 0;
     while (1) {
-        if (key != clear)
+        if (key != clear) {
             ret = add_entry(table, str_len + 1, key, entry.suffix);
+            if (ret == -1) {
+                free(table);
+                return -1;
+            }
+        }
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
         if (key == stop) break;
         if (ret == 1) key_size++;
@@ -319,9 +327,12 @@ read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
             table->entries[table->nentries - 1].suffix = entry.suffix;
     }
     free(table);
+    return 0;
 }
 
-void
+/* Read image.
+ * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
+int
 read_image(GIF *gif)
 {
     uint16_t x, y, w, h;
@@ -345,7 +356,7 @@ read_image(GIF *gif)
     } else
         gif->palette = &gif->gct;
     /* Image Data. */
-    read_image_data(gif, x, y, w);
+    return read_image_data(gif, x, y, w);
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
@@ -363,7 +374,8 @@ get_frame(GIF *gif)
         else return -1;
         read(gif->fd, &sep, 1);
     }
-    read_image(gif);
+    if (read_image(gif) == -1)
+        return -1;
     return 1;
 }
 
