@@ -3,31 +3,31 @@
 
 #include <stdint.h>
 
-typedef struct Palette {
+typedef struct gd_Palette {
     int size;
     uint8_t colors[0x100 * 3];
-} Palette;
+} gd_Palette;
 
-typedef struct GCE {
+typedef struct gd_GCE {
     uint16_t delay;
     uint8_t tindex;
     uint8_t disposal;
     int input;
     int transparency;
-} GCE;
+} gd_GCE;
 
-typedef struct GIF {
+typedef struct gd_GIF {
     int fd;
     uint16_t width, height;
     uint16_t loop_count;
-    GCE gce;
-    Palette *palette;
-    Palette lct, gct;
+    gd_GCE gce;
+    gd_Palette *palette;
+    gd_Palette lct, gct;
     uint8_t *frame;
-} GIF;
+} gd_GIF;
 
-GIF *open_gif(const char *fname);
-int get_frame(GIF *gif);
-void close_gif(GIF *gif);
+gd_GIF *gd_open_gif(const char *fname);
+int gd_get_frame(gd_GIF *gif);
+void gd_close_gif(gd_GIF *gif);
 
 #endif /* GIFDEC_H */

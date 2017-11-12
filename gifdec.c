@@ -33,15 +33,15 @@ read_num(int fd)
     return bytes[0] + (((uint16_t) bytes[1]) << 8);
 }
 
-GIF *
-open_gif(const char *fname)
+gd_GIF *
+gd_open_gif(const char *fname)
 {
     int fd;
     uint8_t sigver[3];
     uint16_t width, height;
     uint8_t fdsz, bgidx, aspect;
     int gct_sz;
-    GIF *gif;
+    gd_GIF *gif;
 
     fd = open(fname, O_RDONLY);
     if (fd == -1) return NULL;
@@ -79,7 +79,7 @@ open_gif(const char *fname)
     read(fd, &bgidx, 1);
     /* Aspect Ratio */
     read(fd, &aspect, 1);
-    /* Create GIF Structure. */
+    /* Create gd_GIF Structure. */
     gif = calloc(1, sizeof(*gif) + width * height);
     if (!gif) goto fail;
     gif->fd = fd;
@@ -98,7 +98,7 @@ ok:
 }
 
 static void
-discard_sub_blocks(GIF *gif)
+discard_sub_blocks(gd_GIF *gif)
 {
     uint8_t size;
 
@@ -110,7 +110,7 @@ discard_sub_blocks(GIF *gif)
 
 /* Ignored extension. */
 static void
-read_plain_text_ext(GIF *gif)
+read_plain_text_ext(gd_GIF *gif)
 {
     fprintf(stderr, "ignoring plain text extension\n");
     /* Discard plain text metadata. */
@@ -120,7 +120,7 @@ read_plain_text_ext(GIF *gif)
 }
 
 static void
-read_graphic_control_ext(GIF *gif)
+read_graphic_control_ext(gd_GIF *gif)
 {
     uint8_t rdit;
 
@@ -138,7 +138,7 @@ read_graphic_control_ext(GIF *gif)
 
 /* Ignored extension. */
 static void
-read_comment_ext(GIF *gif)
+read_comment_ext(gd_GIF *gif)
 {
     fprintf(stderr, "ignoring comment extension\n");
     /* Discard comment sub-blocks. */
@@ -146,7 +146,7 @@ read_comment_ext(GIF *gif)
 }
 
 static void
-read_application_ext(GIF *gif)
+read_application_ext(gd_GIF *gif)
 {
     char app_id[8];
     char app_auth_code[3];
@@ -171,7 +171,7 @@ read_application_ext(GIF *gif)
 }
 
 static void
-read_ext(GIF *gif)
+read_ext(gd_GIF *gif)
 {
     uint8_t label;
 
@@ -233,7 +233,7 @@ add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
 }
 
 static uint16_t
-get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
+get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
 {
     int bits_read;
     int rpad;
@@ -262,7 +262,7 @@ get_key(GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
 /* Decompress image pixels.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
 static int
-read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
+read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
     uint8_t sub_len, shift, byte;
     int key_size;
@@ -314,7 +314,7 @@ read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 /* Read image.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
 static int
-read_image(GIF *gif)
+read_image(gd_GIF *gif)
 {
     uint16_t x, y, w, h;
     uint8_t fisrz;
@@ -342,7 +342,7 @@ read_image(GIF *gif)
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
 int
-get_frame(GIF *gif)
+gd_get_frame(gd_GIF *gif)
 {
     char sep;
 
@@ -361,7 +361,7 @@ get_frame(GIF *gif)
 }
 
 void
-close_gif(GIF *gif)
+gd_close_gif(gd_GIF *gif)
 {
     close(gif->fd);
     free(gif);
