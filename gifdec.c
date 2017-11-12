@@ -237,12 +237,15 @@ new_table(int key_size)
  *  +1 if key size must be incremented after this addition
  *  -1 if could not realloc table */
 int
-add_entry(Table *table, uint16_t length, uint16_t prefix, uint8_t suffix)
+add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
 {
+    Table *table = *tablep;
     if (table->nentries == table->bulk) {
         table->bulk *= 2;
         table = realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
         if (!table) return -1;
+        table->entries = (Entry *) &table[1];
+        *tablep = table;
     }
     table->entries[table->nentries] = (Entry) {length, prefix, suffix};
     table->nentries++;
@@ -303,7 +306,7 @@ read_image_data(GIF *gif, uint16_t x, uint16_t y, uint16_t w)
     ret = 0;
     while (1) {
         if (key != clear) {
-            ret = add_entry(table, str_len + 1, key, entry.suffix);
+            ret = add_entry(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
                 free(table);
                 return -1;
