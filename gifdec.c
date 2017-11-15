@@ -265,7 +265,7 @@ static int
 read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
     uint8_t sub_len, shift, byte;
-    int key_size;
+    int init_key_size, key_size;
     int frm_off, str_len, p;
     uint16_t key, clear, stop;
     int ret;
@@ -276,14 +276,17 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
     key_size = (int) byte;
     clear = 1 << key_size;
     stop = clear + 1;
+    init_key_size = key_size + 1;
     table = new_table(key_size);
-    key_size++;
     sub_len = shift = 0;
     key = get_key(gif, key_size, &sub_len, &shift, &byte); /* clear code */
     frm_off = 0;
     ret = 0;
     while (1) {
-        if (key != clear) {
+        if (key == clear) {
+            key_size = init_key_size;
+            table->nentries = (1 << key_size) + 2;
+        } else {
             ret = add_entry(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
                 free(table);
@@ -291,6 +294,7 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
             }
         }
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
+        if (key == clear) continue;
         if (key == stop) break;
         if (ret == 1) key_size++;
         entry = table->entries[key];
