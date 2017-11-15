@@ -265,7 +265,7 @@ static int
 read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 {
     uint8_t sub_len, shift, byte;
-    int init_key_size, key_size;
+    int init_key_size, key_size, table_is_full;
     int frm_off, str_len, p;
     uint16_t key, clear, stop;
     int ret;
@@ -287,11 +287,16 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
         if (key == clear) {
             key_size = init_key_size;
             table->nentries = (1 << (key_size - 1)) + 2;
-        } else {
+            table_is_full = 0;
+        } else if (!table_is_full) {
             ret = add_entry(&table, str_len + 1, key, entry.suffix);
             if (ret == -1) {
                 free(table);
                 return -1;
+            }
+            if (table->nentries == 0x1000) {
+                ret = 0;
+                table_is_full = 1;
             }
         }
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
@@ -309,12 +314,13 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
                 entry = table->entries[entry.prefix];
         }
         frm_off += str_len;
-        if (key < table->nentries - 1)
+        if (key < table->nentries - 1 && !table_is_full)
             table->entries[table->nentries - 1].suffix = entry.suffix;
     }
     free(table);
     lseek(gif->fd, sub_len, SEEK_CUR);
-    read(gif->fd, &sub_len, 1); /* Must be zero! */
+    discard_sub_blocks(gif);
+    /* read(gif->fd, &sub_len, 1); Must be zero! */
     return 0;
 }
 
