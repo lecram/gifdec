@@ -80,7 +80,7 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif) + width * height);
+    gif = calloc(1, sizeof(*gif) + 2 * width * height);
     if (!gif) goto fail;
     gif->fd = fd;
     gif->width  = width;
@@ -89,7 +89,11 @@ gd_open_gif(const char *fname)
     gif->gct.size = gct_sz;
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
+    gif->bgcolor = bgidx;
     gif->frame = (uint8_t *) &gif[1];
+    gif->back = &gif->frame[gif->width * gif->height];
+    if (gif->bgcolor)
+        memset(gif->frame, gif->bgcolor, gif->width * gif->height);
     goto ok;
 fail:
     close(fd);
@@ -327,7 +331,7 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 static int
 read_image(gd_GIF *gif)
 {
-    uint16_t x, y, w, h;
+    uint16_t x, y, w, h, i, j;
     uint8_t fisrz;
     int interlace;
 
@@ -347,6 +351,31 @@ read_image(gd_GIF *gif)
         gif->palette = &gif->lct;
     } else
         gif->palette = &gif->gct;
+    if (gif->prev_disposal == 3) {
+        j = gif->prev_y * gif->width + gif->prev_x;
+        for (i = 0; i < gif->prev_h; i++) {
+            memcpy(&gif->frame[j], &gif->back[j], gif->prev_w);
+            j += gif->width;
+        }
+    } else if (gif->prev_disposal == 2) {
+        j = gif->prev_y * gif->width + gif->prev_x;
+        for (i = 0; i < gif->prev_h; i++) {
+            memset(&gif->frame[j], gif->bgcolor, gif->prev_w);
+            j += gif->width;
+        }
+    }
+    if (gif->gce.disposal == 3) {
+        j = y * gif->width + x;
+        for (i = 0; i < h; i++) {
+            memcpy(&gif->back[j], &gif->frame[j], w);
+            j += gif->width;
+        }
+        gif->prev_x = x;
+        gif->prev_y = y;
+        gif->prev_w = w;
+        gif->prev_h = h;
+    }
+    gif->prev_disposal = gif->gce.disposal;
     /* Image Data. */
     return read_image_data(gif, x, y, w);
 }

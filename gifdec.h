@@ -23,7 +23,10 @@ typedef struct gd_GIF {
     gd_GCE gce;
     gd_Palette *palette;
     gd_Palette lct, gct;
-    uint8_t *frame;
+    uint16_t prev_x, prev_y, prev_w, prev_h;
+    uint8_t prev_disposal;
+    uint8_t bgcolor;
+    uint8_t *frame, *back;
 } gd_GIF;
 
 gd_GIF *gd_open_gif(const char *fname);
