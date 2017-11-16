@@ -311,7 +311,8 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
         str_len = entry.length;
         while (1) {
             p = frm_off + entry.length - 1;
-            gif->frame[(y + p / w) * gif->width + x + p % w] = entry.suffix;
+            if (!gif->gce.transparency || entry.suffix != gif->gce.tindex)
+                gif->frame[(y + p / w) * gif->width + x + p % w] = entry.suffix;
             if (entry.prefix == 0xFFF)
                 break;
             else
