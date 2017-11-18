@@ -112,13 +112,29 @@ discard_sub_blocks(gd_GIF *gif)
     } while (size);
 }
 
-/* Ignored extension. */
 static void
 read_plain_text_ext(gd_GIF *gif)
 {
-    fprintf(stderr, "ignoring plain text extension\n");
-    /* Discard plain text metadata. */
-    lseek(gif->fd, 13, SEEK_CUR);
+    if (gif->plain_text) {
+        uint16_t tx, ty, tw, th;
+        uint8_t cw, ch, fg, bg;
+        off_t sub_block;
+        lseek(gif->fd, 1, SEEK_CUR); /* block size = 12 */
+        tx = read_num(gif->fd);
+        ty = read_num(gif->fd);
+        tw = read_num(gif->fd);
+        th = read_num(gif->fd);
+        read(gif->fd, &cw, 1);
+        read(gif->fd, &ch, 1);
+        read(gif->fd, &fg, 1);
+        read(gif->fd, &bg, 1);
+        sub_block = lseek(gif->fd, 0, SEEK_CUR);
+        gif->plain_text(gif, tx, ty, tw, th, cw, ch, fg, bg);
+        lseek(gif->fd, sub_block, SEEK_SET);
+    } else {
+        /* Discard plain text metadata. */
+        lseek(gif->fd, 13, SEEK_CUR);
+    }
     /* Discard plain text sub-blocks. */
     discard_sub_blocks(gif);
 }
@@ -140,11 +156,14 @@ read_graphic_control_ext(gd_GIF *gif)
     lseek(gif->fd, 1, SEEK_CUR);
 }
 
-/* Ignored extension. */
 static void
 read_comment_ext(gd_GIF *gif)
 {
-    fprintf(stderr, "ignoring comment extension\n");
+    if (gif->comment) {
+        off_t sub_block = lseek(gif->fd, 0, SEEK_CUR);
+        gif->comment(gif);
+        lseek(gif->fd, sub_block, SEEK_SET);
+    }
     /* Discard comment sub-blocks. */
     discard_sub_blocks(gif);
 }
@@ -167,9 +186,12 @@ read_application_ext(gd_GIF *gif)
         gif->loop_count = read_num(gif->fd);
         /* Skip block terminator. */
         lseek(gif->fd, 1, SEEK_CUR);
+    } else if (gif->application) {
+        off_t sub_block = lseek(gif->fd, 0, SEEK_CUR);
+        gif->application(gif, app_id, app_auth_code);
+        lseek(gif->fd, sub_block, SEEK_SET);
+        discard_sub_blocks(gif);
     } else {
-        fprintf(stderr, "ignoring application extension: %.*s\n",
-                (int) sizeof(app_id), app_id);
         discard_sub_blocks(gif);
     }
 }

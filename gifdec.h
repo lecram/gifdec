@@ -23,6 +23,13 @@ typedef struct gd_GIF {
     gd_GCE gce;
     gd_Palette *palette;
     gd_Palette lct, gct;
+    void (*plain_text)(
+        struct gd_GIF *gif, uint16_t tx, uint16_t ty,
+        uint16_t tw, uint16_t th, uint8_t cw, uint8_t ch,
+        uint8_t fg, uint8_t bg
+    );
+    void (*comment)(struct gd_GIF *gif);
+    void (*application)(struct gd_GIF *gif, char id[8], char auth[3]);
     uint16_t prev_x, prev_y, prev_w, prev_h;
     uint8_t prev_disposal;
     uint8_t bgcolor;
