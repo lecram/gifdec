@@ -377,18 +377,34 @@ read_image(gd_GIF *gif)
 }
 
 static void
-dispose(gd_GIF *gif)
+render_frame_rect(gd_GIF *gif, uint8_t *buffer)
 {
     int i, j, k;
     uint8_t index, *color;
+    i = (gif->fy * gif->width + gif->fx) * 3;
+    for (j = 0; j < gif->fh; j++) {
+        for (k = 0; k < gif->fw; k++) {
+            index = gif->frame[j * gif->fw + k];
+            color = &gif->palette->colors[index];
+            if (!gif->gce.transparency || index != gif->gce.tindex)
+                memcpy(&buffer[i+k*3], color, 3);
+        }
+        i += gif->width * 3;
+    }
+}
+
+static void
+dispose(gd_GIF *gif)
+{
+    int i, j, k;
+    uint8_t *bgcolor;
     switch (gif->gce.disposal) {
     case 2: /* Restore to background color. */
-        color = &gif->palette->colors[gif->bgindex*3];
+        bgcolor = &gif->palette->colors[gif->bgindex*3];
         i = (gif->fy * gif->width + gif->fx) * 3;
         for (j = 0; j < gif->fh; j++) {
-            for (k = 0; k < gif->fw; k++) {
-                memcpy(&gif->canvas[i+k*3], color, 3);
-            }
+            for (k = 0; k < gif->fw; k++)
+                memcpy(&gif->canvas[i+k*3], bgcolor, 3);
             i += gif->width * 3;
         }
         break;
@@ -396,16 +412,7 @@ dispose(gd_GIF *gif)
         break;
     default:
         /* Add frame non-transparent pixels to canvas. */
-        i = (gif->fy * gif->width + gif->fx) * 3;
-        for (j = 0; j < gif->fh; j++) {
-            for (k = 0; k < gif->fw; k++) {
-                index = gif->frame[j * gif->fw + k];
-                color = &gif->palette->colors[index];
-                if (!gif->gce.transparency || index != gif->gce.tindex)
-                    memcpy(&gif->canvas[i+k*3], color, 3);
-            }
-            i += gif->width * 3;
-        }
+        render_frame_rect(gif, gif->canvas);
     }
 }
 
@@ -433,19 +440,8 @@ gd_get_frame(gd_GIF *gif)
 void
 gd_render_frame(gd_GIF *gif, uint8_t *buffer)
 {
-    int i, j, k;
-    uint8_t index, *color;
     memcpy(buffer, gif->canvas, gif->width * gif->height * 3);
-    i = (gif->fy * gif->width + gif->fx) * 3;
-    for (j = 0; j < gif->fh; j++) {
-        for (k = 0; k < gif->fw; k++) {
-            index = gif->frame[j * gif->fw + k];
-            color = &gif->palette->colors[index];
-            if (!gif->gce.transparency || index != gif->gce.tindex)
-                memcpy(&buffer[i+k*3], color, 3);
-        }
-        i += gif->width * 3;
-    }
+    render_frame_rect(gif, buffer);
 }
 
 void
