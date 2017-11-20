@@ -30,10 +30,9 @@ typedef struct gd_GIF {
     );
     void (*comment)(struct gd_GIF *gif);
     void (*application)(struct gd_GIF *gif, char id[8], char auth[3]);
-    uint16_t prev_x, prev_y, prev_w, prev_h;
-    uint8_t prev_disposal;
-    uint8_t bgcolor;
-    uint8_t *frame, *back;
+    uint16_t fx, fy, fw, fh;
+    uint8_t bgindex;
+    uint8_t *canvas, *frame;
 } gd_GIF;
 
 gd_GIF *gd_open_gif(const char *fname);

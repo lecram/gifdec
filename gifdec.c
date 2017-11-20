@@ -80,7 +80,7 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif) + 2 * width * height);
+    gif = calloc(1, sizeof(*gif) + 4 * width * height);
     if (!gif) goto fail;
     gif->fd = fd;
     gif->width  = width;
@@ -89,11 +89,11 @@ gd_open_gif(const char *fname)
     gif->gct.size = gct_sz;
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
-    gif->bgcolor = bgidx;
-    gif->frame = (uint8_t *) &gif[1];
-    gif->back = &gif->frame[gif->width * gif->height];
-    if (gif->bgcolor)
-        memset(gif->frame, gif->bgcolor, gif->width * gif->height);
+    gif->bgindex = bgidx;
+    gif->canvas = (uint8_t *) &gif[1];
+    gif->frame = &gif->canvas[3 * width * height];
+    if (gif->bgindex)
+        memset(gif->frame, gif->bgindex, gif->width * gif->height);
     goto ok;
 fail:
     close(fd);
@@ -288,7 +288,7 @@ get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *by
 /* Decompress image pixels.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
 static int
-read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
+read_image_data(gd_GIF *gif)
 {
     uint8_t sub_len, shift, byte;
     int init_key_size, key_size, table_is_full;
@@ -333,8 +333,7 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
         str_len = entry.length;
         while (1) {
             p = frm_off + entry.length - 1;
-            if (!gif->gce.transparency || entry.suffix != gif->gce.tindex)
-                gif->frame[(y + p / w) * gif->width + x + p % w] = entry.suffix;
+            gif->frame[(gif->fy + p / gif->fw) * gif->width + gif->fx + p % gif->fw] = entry.suffix;
             if (entry.prefix == 0xFFF)
                 break;
             else
@@ -354,15 +353,14 @@ read_image_data(gd_GIF *gif, uint16_t x, uint16_t y, uint16_t w)
 static int
 read_image(gd_GIF *gif)
 {
-    uint16_t x, y, w, h, i, j;
     uint8_t fisrz;
     int interlace;
 
     /* Image Descriptor. */
-    x = read_num(gif->fd);
-    y = read_num(gif->fd);
-    w = read_num(gif->fd);
-    h = read_num(gif->fd);
+    gif->fx = read_num(gif->fd);
+    gif->fy = read_num(gif->fd);
+    gif->fw = read_num(gif->fd);
+    gif->fh = read_num(gif->fd);
     read(gif->fd, &fisrz, 1);
     interlace = fisrz & 0x40;
     /* Ignore Sort Flag. */
@@ -374,33 +372,41 @@ read_image(gd_GIF *gif)
         gif->palette = &gif->lct;
     } else
         gif->palette = &gif->gct;
-    if (gif->prev_disposal == 3) {
-        j = gif->prev_y * gif->width + gif->prev_x;
-        for (i = 0; i < gif->prev_h; i++) {
-            memcpy(&gif->frame[j], &gif->back[j], gif->prev_w);
-            j += gif->width;
-        }
-    } else if (gif->prev_disposal == 2) {
-        j = gif->prev_y * gif->width + gif->prev_x;
-        for (i = 0; i < gif->prev_h; i++) {
-            memset(&gif->frame[j], gif->bgcolor, gif->prev_w);
-            j += gif->width;
-        }
-    }
-    if (gif->gce.disposal == 3) {
-        j = y * gif->width + x;
-        for (i = 0; i < h; i++) {
-            memcpy(&gif->back[j], &gif->frame[j], w);
-            j += gif->width;
-        }
-        gif->prev_x = x;
-        gif->prev_y = y;
-        gif->prev_w = w;
-        gif->prev_h = h;
-    }
-    gif->prev_disposal = gif->gce.disposal;
     /* Image Data. */
-    return read_image_data(gif, x, y, w);
+    return read_image_data(gif);
+}
+
+void
+dispose(gd_GIF *gif)
+{
+    int i, j, k;
+    uint8_t index, *color;
+    switch (gif->gce.disposal) {
+    case 2: /* Restore to background color. */
+        color = &gif->palette->colors[gif->bgindex*3];
+        i = (gif->fy * gif->width + gif->fx) * 3;
+        for (j = 0; j < gif->fh; j++) {
+            for (k = 0; k < gif->fw; k++) {
+                memcpy(&gif->canvas[i+k*3], color, 3);
+            }
+            i += gif->width * 3;
+        }
+        break;
+    case 3: /* Restore to previous, i.e., don't update canvas.*/
+        break;
+    default:
+        /* Add frame non-transparent pixels to canvas. */
+        i = (gif->fy * gif->width + gif->fx) * 3;
+        for (j = 0; j < gif->fh; j++) {
+            for (k = 0; k < gif->fw; k++) {
+                index = gif->frame[j * gif->fw + k];
+                color = &gif->palette->colors[index];
+                if (!gif->gce.transparency || index != gif->gce.tindex)
+                    memcpy(&gif->canvas[i+k*3], color, 3);
+            }
+            i += gif->width * 3;
+        }
+    }
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
@@ -409,6 +415,7 @@ gd_get_frame(gd_GIF *gif)
 {
     char sep;
 
+    dispose(gif);
     read(gif->fd, &sep, 1);
     while (sep != ',') {
         if (sep == ';')
