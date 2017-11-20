@@ -376,7 +376,7 @@ read_image(gd_GIF *gif)
     return read_image_data(gif);
 }
 
-void
+static void
 dispose(gd_GIF *gif)
 {
     int i, j, k;
