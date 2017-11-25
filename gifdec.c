@@ -64,12 +64,12 @@ gd_open_gif(const char *fname)
     read(fd, &fdsz, 1);
     /* Presence of GCT */
     if (!(fdsz & 0x80)) {
-        fprintf(stderr, "no global color table");
+        fprintf(stderr, "no global color table\n");
         goto fail;
     }
     /* Color Space's Depth */
     if (((fdsz >> 4) & 7) != 7) {
-        fprintf(stderr, "depth of color space is not 8 bits");
+        fprintf(stderr, "depth of color space is not 8 bits\n");
         goto fail;
     }
     /* Ignore Sort Flag. */
