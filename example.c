@@ -51,7 +51,7 @@ main(int argc, char *argv[])
         return 1;
     }
     snprintf(title, sizeof(title) - 1, "GIF %dx%d %d colors",
-             gif->width, gif->width, gif->palette->size);
+             gif->width, gif->height, gif->palette->size);
     SDL_SetWindowTitle(window, title);
     color = &gif->gct.colors[gif->bgindex * 3];
     SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], 0x00);
