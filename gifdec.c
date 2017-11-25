@@ -94,6 +94,7 @@ gd_open_gif(const char *fname)
     gif->frame = &gif->canvas[3 * width * height];
     if (gif->bgindex)
         memset(gif->frame, gif->bgindex, gif->width * gif->height);
+    gif->anim_start = lseek(fd, 0, SEEK_CUR);
     goto ok;
 fail:
     close(fd);
@@ -442,6 +443,12 @@ gd_render_frame(gd_GIF *gif, uint8_t *buffer)
 {
     memcpy(buffer, gif->canvas, gif->width * gif->height * 3);
     render_frame_rect(gif, buffer);
+}
+
+void
+gd_rewind(gd_GIF *gif)
+{
+    lseek(gif->fd, gif->anim_start, SEEK_SET);
 }
 
 void

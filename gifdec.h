@@ -2,6 +2,7 @@
 #define GIFDEC_H
 
 #include <stdint.h>
+#include <sys/types.h>
 
 typedef struct gd_Palette {
     int size;
@@ -18,6 +19,7 @@ typedef struct gd_GCE {
 
 typedef struct gd_GIF {
     int fd;
+    off_t anim_start;
     uint16_t width, height;
     uint16_t loop_count;
     gd_GCE gce;
@@ -38,6 +40,7 @@ typedef struct gd_GIF {
 gd_GIF *gd_open_gif(const char *fname);
 int gd_get_frame(gd_GIF *gif);
 void gd_render_frame(gd_GIF *gif, uint8_t *buffer);
+void gd_rewind(gd_GIF *gif);
 void gd_close_gif(gd_GIF *gif);
 
 #endif /* GIFDEC_H */
