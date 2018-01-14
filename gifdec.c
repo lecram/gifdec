@@ -298,9 +298,14 @@ read_image_data(gd_GIF *gif)
     int ret;
     Table *table;
     Entry entry;
+    off_t start, end;
 
     read(gif->fd, &byte, 1);
     key_size = (int) byte;
+    start = lseek(gif->fd, 0, SEEK_CUR);
+    discard_sub_blocks(gif);
+    end = lseek(gif->fd, 0, SEEK_CUR);
+    lseek(gif->fd, start, SEEK_SET);
     clear = 1 << key_size;
     stop = clear + 1;
     table = new_table(key_size);
@@ -346,6 +351,7 @@ read_image_data(gd_GIF *gif)
     }
     free(table);
     read(gif->fd, &sub_len, 1); /* Must be zero! */
+    lseek(gif->fd, end, SEEK_SET);
     return 0;
 }
 
