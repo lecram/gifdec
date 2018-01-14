@@ -402,11 +402,11 @@ dispose(gd_GIF *gif)
     switch (gif->gce.disposal) {
     case 2: /* Restore to background color. */
         bgcolor = &gif->palette->colors[gif->bgindex*3];
-        i = (gif->fy * gif->width + gif->fx) * 3;
+        i = gif->fy * gif->width + gif->fx;
         for (j = 0; j < gif->fh; j++) {
             for (k = 0; k < gif->fw; k++)
-                memcpy(&gif->canvas[i+k*3], bgcolor, 3);
-            i += gif->width * 3;
+                memcpy(&gif->canvas[(i+k)*3], bgcolor, 3);
+            i += gif->width;
         }
         break;
     case 3: /* Restore to previous, i.e., don't update canvas.*/
