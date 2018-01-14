@@ -382,15 +382,15 @@ render_frame_rect(gd_GIF *gif, uint8_t *buffer)
 {
     int i, j, k;
     uint8_t index, *color;
-    i = (gif->fy * gif->width + gif->fx) * 3;
+    i = gif->fy * gif->width + gif->fx;
     for (j = 0; j < gif->fh; j++) {
         for (k = 0; k < gif->fw; k++) {
             index = gif->frame[j * gif->fw + k];
             color = &gif->palette->colors[index*3];
             if (!gif->gce.transparency || index != gif->gce.tindex)
-                memcpy(&buffer[i+k*3], color, 3);
+                memcpy(&buffer[(i+k)*3], color, 3);
         }
-        i += gif->width * 3;
+        i += gif->width;
     }
 }
 
