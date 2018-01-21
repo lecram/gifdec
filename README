@@ -185,7 +185,6 @@ function. Here's an example, printing the comment to stdout:
 Whenever a Plain  Text Extension block is  found, `gif->plain_text()` is
 called.
 
-
     void (*plain_text)(
         struct gd_GIF *gif, uint16_t tx, uint16_t ty,
         uint16_t tw, uint16_t th, uint8_t cw, uint8_t ch,
