@@ -159,7 +159,7 @@ Data Stream." Encoders  are recommended to only include  "text using the
 7-bit ASCII character set" in GIF comments.
 
 The actual comment is stored as  a variable-sized block and must be read
-from  the file  (using  the  file descriptor  gif->fd)  by the  callback
+from  the file  (using the  file descriptor  `gif->fd`) by  the callback
 function. Here's an example, printing the comment to stdout:
 
     void
