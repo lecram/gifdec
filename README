@@ -125,19 +125,22 @@ GIF file without closing and reopening it.
 
 6. Putting it all together
 
-gd_GIF *gif = gd_open_gif("some_animation.gif");
-char *buffer = malloc(gif->width * gif->height * 3);
-for (unsigned looped = 1;; looped++) {
-    while (gd_get_frame(gif)) {
-        gd_render_frame(gif, buffer);
-        /* insert code to render buffer to screen here */
+A simplified skeleton of a GIF viewer may look like this:
+
+    gd_GIF *gif = gd_open_gif("some_animation.gif");
+    char *buffer = malloc(gif->width * gif->height * 3);
+    for (unsigned looped = 1;; looped++) {
+        while (gd_get_frame(gif)) {
+            gd_render_frame(gif, buffer);
+            /* insert code to render buffer to screen
+                and wait for delay time to pass here  */
+        }
+        if (looped == gif->loop_count)
+            break;
+        gd_rewind(gif);
     }
-    if (looped == gif->loop_count)
-        break;
-    gd_rewind(gif);
-}
-free(buffer);
-gd_close_gif(gif);
+    free(buffer);
+    gd_close_gif(gif);
 
 7. Reading streamed metadata with extension hooks
 
