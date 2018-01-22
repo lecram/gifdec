@@ -26,7 +26,7 @@ main(int argc, char *argv[])
     int i, j;
     Uint32 pixel;
     int ret, paused, quit;
-    Uint32 t0, t1;
+    Uint32 t0, t1, delay, delta;
 
     if (argc != 2) {
         fprintf(stderr, "usage:\n  %s gif-file\n", argv[0]);
@@ -101,7 +101,10 @@ main(int argc, char *argv[])
         SDL_RenderPresent(renderer);
         SDL_DestroyTexture(texture);
         t1 = SDL_GetTicks();
-        SDL_Delay(gif->gce.delay * 10 - (t1 - t0));
+        delta = t1 - t0;
+        delay = gif->gce.delay * 10;
+        delay = delay > delta ? delay - delta : 1;
+        SDL_Delay(delay);
         if (ret == 0)
             gd_rewind(gif);
     }
