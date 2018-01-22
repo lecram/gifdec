@@ -25,7 +25,7 @@ main(int argc, char *argv[])
     void *addr;
     int i, j;
     Uint32 pixel;
-    int ret, paused;
+    int ret, paused, quit;
     Uint32 t0, t1;
 
     if (argc != 2) {
@@ -63,17 +63,23 @@ main(int argc, char *argv[])
         return 1;
     }
     paused = 0;
+    quit = 0;
     while (1) {
-        SDL_PollEvent(&event);
-        if (event.type == SDL_QUIT)
-            break;
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_q)
-                break;
-            else if (event.key.keysym.sym == SDLK_SPACE)
-                paused = !paused;
+        while (SDL_PollEvent(&event) && !quit) {
+            if (event.type == SDL_QUIT)
+                quit = 1;
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_q)
+                    quit = 1;
+                else if (event.key.keysym.sym == SDLK_SPACE)
+                    paused = !paused;
+            }
         }
-        if (paused) continue;
+        if (quit) break;
+        if (paused) {
+            SDL_Delay(10);
+            continue;
+        }
         t0 = SDL_GetTicks();
         ret = gd_get_frame(gif);
         if (ret == -1)
