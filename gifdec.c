@@ -38,7 +38,7 @@ gd_open_gif(const char *fname)
 {
     int fd;
     uint8_t sigver[3];
-    uint16_t width, height;
+    uint16_t width, height, depth;
     uint8_t fdsz, bgidx, aspect;
     int gct_sz;
     gd_GIF *gif;
@@ -68,10 +68,7 @@ gd_open_gif(const char *fname)
         goto fail;
     }
     /* Color Space's Depth */
-    if (((fdsz >> 4) & 7) != 7) {
-        fprintf(stderr, "depth of color space is not 8 bits\n");
-        goto fail;
-    }
+    depth = ((fdsz >> 4) & 7) + 1;
     /* Ignore Sort Flag. */
     /* GCT Size */
     gct_sz = 1 << ((fdsz & 0x07) + 1);
@@ -85,6 +82,7 @@ gd_open_gif(const char *fname)
     gif->fd = fd;
     gif->width  = width;
     gif->height = height;
+    gif->depth  = depth;
     /* Read GCT */
     gif->gct.size = gct_sz;
     read(fd, gif->gct.colors, 3 * gif->gct.size);
