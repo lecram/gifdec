@@ -284,14 +284,36 @@ get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *by
     return key;
 }
 
+/* Compute output index of y-th input line, in frame of height h. */
+static int
+interlaced_line_index(int h, int y)
+{
+    int p; /* number of lines in current pass */
+
+    p = (h - 1) / 8 + 1;
+    if (y < p) /* pass 1 */
+        return y * 8;
+    y -= p;
+    p = (h - 5) / 8 + 1;
+    if (y < p) /* pass 2 */
+        return y * 8 + 4;
+    y -= p;
+    p = (h - 3) / 4 + 1;
+    if (y < p) /* pass 3 */
+        return y * 4 + 2;
+    y -= p;
+    /* pass 4 */
+    return y * 2 + 1;
+}
+
 /* Decompress image pixels.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
 static int
-read_image_data(gd_GIF *gif)
+read_image_data(gd_GIF *gif, int interlace)
 {
     uint8_t sub_len, shift, byte;
     int init_key_size, key_size, table_is_full;
-    int frm_off, str_len, p;
+    int frm_off, str_len, p, x, y;
     uint16_t key, clear, stop;
     int ret;
     Table *table;
@@ -337,7 +359,11 @@ read_image_data(gd_GIF *gif)
         str_len = entry.length;
         while (1) {
             p = frm_off + entry.length - 1;
-            gif->frame[(gif->fy + p / gif->fw) * gif->width + gif->fx + p % gif->fw] = entry.suffix;
+            x = p % gif->fw;
+            y = p / gif->fw;
+            if (interlace)
+                y = interlaced_line_index((int) gif->fh, y);
+            gif->frame[(gif->fy + y) * gif->width + gif->fx + x] = entry.suffix;
             if (entry.prefix == 0xFFF)
                 break;
             else
@@ -378,7 +404,7 @@ read_image(gd_GIF *gif)
     } else
         gif->palette = &gif->gct;
     /* Image Data. */
-    return read_image_data(gif);
+    return read_image_data(gif, interlace);
 }
 
 static void
