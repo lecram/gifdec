@@ -378,7 +378,24 @@ read_image(gd_GIF *gif)
     } else
         gif->palette = &gif->gct;
     /* Image Data. */
-    return read_image_data(gif);
+    if (read_image_data(gif)) return -1;
+    if (interlace) {
+        // reorganize rows of interlaced frame
+        uint8_t *tmp = malloc(gif->width * gif->height);
+        memcpy(tmp, gif->frame, gif->width * gif->height);
+        int y=0, scan=0, step=8;
+        for (int iy=0; iy<gif->fh; iy++) {
+            memcpy(&gif->frame[(gif->fy + y) * gif->width + gif->fx], &tmp[(gif->fy + iy) * gif->width + gif->fx], gif->fw);
+            y += step;
+            if (y >= gif->fh) {
+                scan++;
+                step = 16>>scan;
+                y = step>>1;
+            }
+        }
+        free(tmp);
+    }
+    return 0;
 }
 
 static void
