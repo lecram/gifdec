@@ -89,7 +89,7 @@ main(int argc, char *argv[])
         color = frame;
         for (i = 0; i < gif->height; i++) {
             for (j = 0; j < gif->width; j++) {
-                if (memcmp(&gif->palette->colors[gif->bgindex*3], color, 3))
+                if (!gd_is_bgcolor(gif, color))
                     pixel = SDL_MapRGB(surface->format, color[0], color[1], color[2]);
                 else if (((i >> 2) + (j >> 2)) & 1)
                     pixel = SDL_MapRGB(surface->format, 0x7F, 0x7F, 0x7F);

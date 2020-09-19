@@ -143,7 +143,32 @@ A simplified skeleton of a GIF viewer may look like this:
     free(buffer);
     gd_close_gif(gif);
 
-7. Reading streamed metadata with extension hooks
+7. Transparent Background
+
+GIFs can mark a certain color in the palette as the "Background Color".
+Pixels having this  color are usually treated as  transparent pixels by
+applications.
+
+The function `gd_is_bgcolor()`  can be used to check whether  a pixel in
+the canvas currently has background color.
+
+    int gd_is_bgcolor(gd_GIF *gif, uint8_t color[3]);
+
+Here's an example of how to use it:
+
+    gd_render_frame(gif, buffer);
+    color = buffer;
+    for (y = 0; y < gif->height; y++) {
+        for (x = 0; x < gif->width; x++) {
+            if (gd_is_bgcolor(gif, color))
+                transparent_pixel(x, y);
+            else
+                opaque_pixel(x, y, color);
+            color += 3;
+        }
+    }
+
+8. Reading streamed metadata with extension hooks
 
 Some  metadata blocks  may occur  any number  of times  in GIF  files in
 between frames.  By default, gifdec  ignore these blocks.  However, it's
