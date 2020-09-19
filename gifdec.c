@@ -40,6 +40,8 @@ gd_open_gif(const char *fname)
     uint8_t sigver[3];
     uint16_t width, height, depth;
     uint8_t fdsz, bgidx, aspect;
+    int i;
+    uint8_t *bgcolor;
     int gct_sz;
     gd_GIF *gif;
 
@@ -92,6 +94,10 @@ gd_open_gif(const char *fname)
     gif->frame = &gif->canvas[3 * width * height];
     if (gif->bgindex)
         memset(gif->frame, gif->bgindex, gif->width * gif->height);
+    bgcolor = &gif->palette->colors[gif->bgindex*3];
+    if (bgcolor[0] || bgcolor[1] || bgcolor [2])
+        for (i = 0; i < gif->width * gif->height; i++)
+            memcpy(&gif->canvas[i*3], bgcolor, 3);
     gif->anim_start = lseek(fd, 0, SEEK_CUR);
     goto ok;
 fail:
