@@ -7,7 +7,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
@@ -47,6 +51,9 @@ gd_open_gif(const char *fname)
 
     fd = open(fname, O_RDONLY);
     if (fd == -1) return NULL;
+#ifdef _WIN32
+    setmode(fd, O_BINARY);
+#endif
     /* Header */
     read(fd, sigver, 3);
     if (memcmp(sigver, "GIF", 3) != 0) {
