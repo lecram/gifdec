@@ -329,7 +329,7 @@ read_image_data(gd_GIF *gif, int interlace)
 {
     uint8_t sub_len, shift, byte;
     int init_key_size, key_size, table_is_full;
-    int frm_off, str_len, p, x, y;
+    int frm_off, frm_size, str_len, i, p, x, y;
     uint16_t key, clear, stop;
     int ret;
     Table *table;
@@ -351,7 +351,8 @@ read_image_data(gd_GIF *gif, int interlace)
     key = get_key(gif, key_size, &sub_len, &shift, &byte); /* clear code */
     frm_off = 0;
     ret = 0;
-    while (1) {
+    frm_size = gif->fw*gif->fh;
+    while (frm_off < frm_size) {
         if (key == clear) {
             key_size = init_key_size;
             table->nentries = (1 << (key_size - 1)) + 2;
@@ -373,7 +374,7 @@ read_image_data(gd_GIF *gif, int interlace)
         if (ret == 1) key_size++;
         entry = table->entries[key];
         str_len = entry.length;
-        while (1) {
+        for (i = 0; i < str_len; i++) {
             p = frm_off + entry.length - 1;
             x = p % gif->fw;
             y = p / gif->fw;
