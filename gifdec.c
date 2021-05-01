@@ -391,7 +391,8 @@ read_image_data(gd_GIF *gif, int interlace)
             table->entries[table->nentries - 1].suffix = entry.suffix;
     }
     free(table);
-    read(gif->fd, &sub_len, 1); /* Must be zero! */
+    if (key == stop)
+        read(gif->fd, &sub_len, 1); /* Must be zero! */
     lseek(gif->fd, end, SEEK_SET);
     return 0;
 }
