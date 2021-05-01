@@ -283,8 +283,11 @@ get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *by
         rpad = (*shift + bits_read) % 8;
         if (rpad == 0) {
             /* Update byte. */
-            if (*sub_len == 0)
+            if (*sub_len == 0) {
                 read(gif->fd, sub_len, 1); /* Must be nonzero! */
+                if (*sub_len == 0)
+                    return 0x1000;
+            }
             read(gif->fd, byte, 1);
             (*sub_len)--;
         }
@@ -366,7 +369,7 @@ read_image_data(gd_GIF *gif, int interlace)
         }
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
         if (key == clear) continue;
-        if (key == stop) break;
+        if (key == stop || key == 0x1000) break;
         if (ret == 1) key_size++;
         entry = table->entries[key];
         str_len = entry.length;
