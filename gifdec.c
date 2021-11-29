@@ -1,12 +1,11 @@
 #include "gifdec.h"
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -19,7 +18,7 @@
 typedef struct Entry {
     uint16_t length;
     uint16_t prefix;
-    uint8_t  suffix;
+    uint8_t suffix;
 } Entry;
 
 typedef struct Table {
@@ -28,18 +27,14 @@ typedef struct Table {
     Entry *entries;
 } Table;
 
-static uint16_t
-read_num(int fd)
-{
+static uint16_t read_num(int fd) {
     uint8_t bytes[2];
 
     read(fd, bytes, 2);
-    return bytes[0] + (((uint16_t) bytes[1]) << 8);
+    return bytes[0] + (((uint16_t)bytes[1]) << 8);
 }
 
-gd_GIF *
-gd_open_gif(const char *fname)
-{
+gd_GIF *gd_open_gif(const char *fname) {
     int fd;
     uint8_t sigver[3];
     uint16_t width, height, depth;
@@ -67,7 +62,7 @@ gd_open_gif(const char *fname)
         goto fail;
     }
     /* Width x Height */
-    width  = read_num(fd);
+    width = read_num(fd);
     height = read_num(fd);
     /* FDSZ */
     read(fd, &fdsz, 1);
@@ -86,36 +81,42 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif) + 4 * width * height);
+    gif = calloc(1, sizeof(*gif));
     if (!gif) goto fail;
     gif->fd = fd;
-    gif->width  = width;
+    gif->width = width;
     gif->height = height;
-    gif->depth  = depth;
+    gif->depth = depth;
     /* Read GCT */
     gif->gct.size = gct_sz;
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->canvas = (uint8_t *) &gif[1];
-    gif->frame = &gif->canvas[3 * width * height];
-    if (gif->bgindex)
-        memset(gif->frame, gif->bgindex, gif->width * gif->height);
-    bgcolor = &gif->palette->colors[gif->bgindex*3];
-    if (bgcolor[0] || bgcolor[1] || bgcolor [2])
-        for (i = 0; i < gif->width * gif->height; i++)
-            memcpy(&gif->canvas[i*3], bgcolor, 3);
+    gif->canvas = calloc(3, width * height);
+    if (!gif->canvas) {
+        free(gif);
+        goto fail;
+    }
+    gif->frame = calloc(1, width * height);
+    if (!gif->frame) {
+        free(gif->canvas);
+        free(gif);
+        goto fail;
+    }
+    if (gif->bgindex) memset(gif->frame, gif->bgindex, gif->width * gif->height);
+    bgcolor = &gif->palette->colors[gif->bgindex * 3];
+    if (bgcolor[0] || bgcolor[1] || bgcolor[2])
+        for (i = 0; i < gif->width * gif->height; i++) memcpy(&gif->canvas[i * 3], bgcolor, 3);
     gif->anim_start = lseek(fd, 0, SEEK_CUR);
     goto ok;
 fail:
     close(fd);
+    return 0;
 ok:
     return gif;
 }
 
-static void
-discard_sub_blocks(gd_GIF *gif)
-{
+static void discard_sub_blocks(gd_GIF *gif) {
     uint8_t size;
 
     do {
@@ -124,9 +125,7 @@ discard_sub_blocks(gd_GIF *gif)
     } while (size);
 }
 
-static void
-read_plain_text_ext(gd_GIF *gif)
-{
+static void read_plain_text_ext(gd_GIF *gif) {
     if (gif->plain_text) {
         uint16_t tx, ty, tw, th;
         uint8_t cw, ch, fg, bg;
@@ -151,9 +150,7 @@ read_plain_text_ext(gd_GIF *gif)
     discard_sub_blocks(gif);
 }
 
-static void
-read_graphic_control_ext(gd_GIF *gif)
-{
+static void read_graphic_control_ext(gd_GIF *gif) {
     uint8_t rdit;
 
     /* Discard block size (always 0x04). */
@@ -168,9 +165,7 @@ read_graphic_control_ext(gd_GIF *gif)
     lseek(gif->fd, 1, SEEK_CUR);
 }
 
-static void
-read_comment_ext(gd_GIF *gif)
-{
+static void read_comment_ext(gd_GIF *gif) {
     if (gif->comment) {
         off_t sub_block = lseek(gif->fd, 0, SEEK_CUR);
         gif->comment(gif);
@@ -180,9 +175,7 @@ read_comment_ext(gd_GIF *gif)
     discard_sub_blocks(gif);
 }
 
-static void
-read_application_ext(gd_GIF *gif)
-{
+static void read_application_ext(gd_GIF *gif) {
     char app_id[8];
     char app_auth_code[3];
 
@@ -208,71 +201,72 @@ read_application_ext(gd_GIF *gif)
     }
 }
 
-static void
-read_ext(gd_GIF *gif)
-{
+static void read_ext(gd_GIF *gif) {
     uint8_t label;
 
     read(gif->fd, &label, 1);
     switch (label) {
-    case 0x01:
-        read_plain_text_ext(gif);
-        break;
-    case 0xF9:
-        read_graphic_control_ext(gif);
-        break;
-    case 0xFE:
-        read_comment_ext(gif);
-        break;
-    case 0xFF:
-        read_application_ext(gif);
-        break;
-    default:
-        fprintf(stderr, "unknown extension: %02X\n", label);
+        case 0x01:
+            read_plain_text_ext(gif);
+            break;
+        case 0xF9:
+            read_graphic_control_ext(gif);
+            break;
+        case 0xFE:
+            read_comment_ext(gif);
+            break;
+        case 0xFF:
+            read_application_ext(gif);
+            break;
+        default:
+            fprintf(stderr, "unknown extension: %02X\n", label);
     }
 }
 
-static Table *
-new_table(int key_size)
-{
+static Table *new_table(int key_size) {
     int key;
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
     Table *table = malloc(sizeof(*table) + sizeof(Entry) * init_bulk);
     if (table) {
         table->bulk = init_bulk;
+        
+        if (key_size >= 31) {
+            printf("key_size too large! (%d)\n", key_size);
+            free(table);
+            return -1;
+        }
+        
         table->nentries = (1 << key_size) + 2;
-        table->entries = (Entry *) &table[1];
-        for (key = 0; key < (1 << key_size); key++)
-            table->entries[key] = (Entry) {1, 0xFFF, key};
+        table->entries = (Entry *)&table[1];
+        for (key = 0; key < (1 << key_size); key++) table->entries[key] = (Entry){1, 0xFFF, key};
+        
+        return table;
+    } else {
+        return -1;
     }
-    return table;
 }
 
 /* Add table entry. Return value:
  *  0 on success
  *  +1 if key size must be incremented after this addition
  *  -1 if could not realloc table */
-static int
-add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
-{
+static int add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix) {
     Table *table = *tablep;
     if (table->nentries == table->bulk) {
         table->bulk *= 2;
         table = realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
         if (!table) return -1;
-        table->entries = (Entry *) &table[1];
+        table->entries = (Entry *)&table[1];
         *tablep = table;
     }
-    table->entries[table->nentries] = (Entry) {length, prefix, suffix};
+    table->entries[table->nentries] = (Entry){length, prefix, suffix};
     table->nentries++;
-    if ((table->nentries & (table->nentries - 1)) == 0)
-        return 1;
+    if ((table->nentries & (table->nentries - 1)) == 0) return 1;
     return 0;
 }
 
-static uint16_t
-get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *byte)
-{
+static uint16_t get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift,
+                        uint8_t *byte) {
     int bits_read;
     int rpad;
     int frag_size;
@@ -285,14 +279,13 @@ get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *by
             /* Update byte. */
             if (*sub_len == 0) {
                 read(gif->fd, sub_len, 1); /* Must be nonzero! */
-                if (*sub_len == 0)
-                    return 0x1000;
+                if (*sub_len == 0) return 0x1000;
             }
             read(gif->fd, byte, 1);
             (*sub_len)--;
         }
         frag_size = MIN(key_size - bits_read, 8 - rpad);
-        key |= ((uint16_t) ((*byte) >> rpad)) << bits_read;
+        key |= ((uint16_t)((*byte) >> rpad)) << bits_read;
     }
     /* Clear extra bits to the left. */
     key &= (1 << key_size) - 1;
@@ -301,9 +294,7 @@ get_key(gd_GIF *gif, int key_size, uint8_t *sub_len, uint8_t *shift, uint8_t *by
 }
 
 /* Compute output index of y-th input line, in frame of height h. */
-static int
-interlaced_line_index(int h, int y)
-{
+static int interlaced_line_index(int h, int y) {
     int p; /* number of lines in current pass */
 
     p = (h - 1) / 8 + 1;
@@ -324,9 +315,7 @@ interlaced_line_index(int h, int y)
 
 /* Decompress image pixels.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
-static int
-read_image_data(gd_GIF *gif, int interlace)
-{
+static int read_image_data(gd_GIF *gif, int interlace) {
     uint8_t sub_len, shift, byte;
     int init_key_size, key_size, table_is_full;
     int frm_off, frm_size, str_len, i, p, x, y;
@@ -337,7 +326,7 @@ read_image_data(gd_GIF *gif, int interlace)
     off_t start, end;
 
     read(gif->fd, &byte, 1);
-    key_size = (int) byte;
+    key_size = (int)byte;
     start = lseek(gif->fd, 0, SEEK_CUR);
     discard_sub_blocks(gif);
     end = lseek(gif->fd, 0, SEEK_CUR);
@@ -345,15 +334,23 @@ read_image_data(gd_GIF *gif, int interlace)
     clear = 1 << key_size;
     stop = clear + 1;
     table = new_table(key_size);
+    if (table == -1) return -1;
     key_size++;
     init_key_size = key_size;
     sub_len = shift = 0;
     key = get_key(gif, key_size, &sub_len, &shift, &byte); /* clear code */
     frm_off = 0;
     ret = 0;
-    frm_size = gif->fw*gif->fh;
+    frm_size = gif->fw * gif->fh;
     while (frm_off < frm_size) {
         if (key == clear) {
+        
+            if (key_size >= 32) {
+                printf("key_size too large! (%d)\n", key_size);
+                free(table);
+                return -1;
+            }
+        
             key_size = init_key_size;
             table->nentries = (1 << (key_size - 1)) + 2;
             table_is_full = 0;
@@ -378,9 +375,9 @@ read_image_data(gd_GIF *gif, int interlace)
             p = frm_off + entry.length - 1;
             x = p % gif->fw;
             y = p / gif->fw;
-            if (interlace)
-                y = interlaced_line_index((int) gif->fh, y);
-            gif->frame[(gif->fy + y) * gif->width + gif->fx + x] = entry.suffix;
+            if (interlace) y = interlaced_line_index((int)gif->fh, y);
+            if (gif->fy + y < gif->height && gif->fx + x < gif->width)
+                gif->frame[(gif->fy + y) * gif->width + gif->fx + x] = entry.suffix;
             if (entry.prefix == 0xFFF)
                 break;
             else
@@ -391,17 +388,14 @@ read_image_data(gd_GIF *gif, int interlace)
             table->entries[table->nentries - 1].suffix = entry.suffix;
     }
     free(table);
-    if (key == stop)
-        read(gif->fd, &sub_len, 1); /* Must be zero! */
+    if (key == stop) read(gif->fd, &sub_len, 1); /* Must be zero! */
     lseek(gif->fd, end, SEEK_SET);
     return 0;
 }
 
 /* Read image.
  * Return 0 on success or -1 on out-of-memory (w.r.t. LZW code table). */
-static int
-read_image(gd_GIF *gif)
-{
+static int read_image(gd_GIF *gif) {
     uint8_t fisrz;
     int interlace;
 
@@ -425,89 +419,78 @@ read_image(gd_GIF *gif)
     return read_image_data(gif, interlace);
 }
 
-static void
-render_frame_rect(gd_GIF *gif, uint8_t *buffer)
-{
+static void render_frame_rect(gd_GIF *gif, uint8_t *buffer) {
     int i, j, k;
+    int maxX = MIN(gif->fx + gif->fw, gif->width);
+    int maxY = MIN(gif->fy + gif->fh, gif->height);
     uint8_t index, *color;
-    i = gif->fy * gif->width + gif->fx;
-    for (j = 0; j < gif->fh; j++) {
-        for (k = 0; k < gif->fw; k++) {
-            index = gif->frame[(gif->fy + j) * gif->width + gif->fx + k];
-            color = &gif->palette->colors[index*3];
+    i = gif->fy * gif->width;
+    for (j = gif->fy; j < maxY; j++) {
+        for (k = gif->fx; k < maxX; k++) {
+            index = gif->frame[j * gif->width + k];
+            color = &gif->palette->colors[index * 3];
             if (!gif->gce.transparency || index != gif->gce.tindex)
-                memcpy(&buffer[(i+k)*3], color, 3);
+                memcpy(&buffer[(i + k) * 3], color, 3);
         }
         i += gif->width;
     }
 }
 
-static void
-dispose(gd_GIF *gif)
-{
+static void dispose(gd_GIF *gif) {
     int i, j, k;
+    int maxX, maxY;
     uint8_t *bgcolor;
     switch (gif->gce.disposal) {
-    case 2: /* Restore to background color. */
-        bgcolor = &gif->palette->colors[gif->bgindex*3];
-        i = gif->fy * gif->width + gif->fx;
-        for (j = 0; j < gif->fh; j++) {
-            for (k = 0; k < gif->fw; k++)
-                memcpy(&gif->canvas[(i+k)*3], bgcolor, 3);
-            i += gif->width;
-        }
-        break;
-    case 3: /* Restore to previous, i.e., don't update canvas.*/
-        break;
-    default:
-        /* Add frame non-transparent pixels to canvas. */
-        render_frame_rect(gif, gif->canvas);
+        case 2: /* Restore to background color. */
+            maxX = MIN(gif->fx + gif->fw, gif->width);
+            maxY = MIN(gif->fy + gif->fh, gif->height);
+            bgcolor = &gif->palette->colors[gif->bgindex * 3];
+            i = gif->fy * gif->width;
+            for (j = gif->fy; j < maxY; j++) {
+                for (k = gif->fx; k < maxX; k++) memcpy(&gif->canvas[(i + k) * 3], bgcolor, 3);
+                i += gif->width;
+            }
+            break;
+        case 3: /* Restore to previous, i.e., don't update canvas.*/
+            break;
+        default:
+            /* Add frame non-transparent pixels to canvas. */
+            render_frame_rect(gif, gif->canvas);
     }
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
-int
-gd_get_frame(gd_GIF *gif)
-{
+int gd_get_frame(gd_GIF *gif) {
     char sep;
 
     dispose(gif);
     read(gif->fd, &sep, 1);
     while (sep != ',') {
-        if (sep == ';')
-            return 0;
+        if (sep == ';') return 0;
         if (sep == '!')
             read_ext(gif);
-        else return -1;
+        else
+            return -1;
         read(gif->fd, &sep, 1);
     }
-    if (read_image(gif) == -1)
-        return -1;
+    if (read_image(gif) == -1) return -1;
     return 1;
 }
 
-void
-gd_render_frame(gd_GIF *gif, uint8_t *buffer)
-{
+void gd_render_frame(gd_GIF *gif, uint8_t *buffer) {
     memcpy(buffer, gif->canvas, gif->width * gif->height * 3);
     render_frame_rect(gif, buffer);
 }
 
-int
-gd_is_bgcolor(gd_GIF *gif, uint8_t color[3])
-{
-    return !memcmp(&gif->palette->colors[gif->bgindex*3], color, 3);
+int gd_is_bgcolor(gd_GIF *gif, uint8_t color[3]) {
+    return !memcmp(&gif->palette->colors[gif->bgindex * 3], color, 3);
 }
 
-void
-gd_rewind(gd_GIF *gif)
-{
-    lseek(gif->fd, gif->anim_start, SEEK_SET);
-}
+void gd_rewind(gd_GIF *gif) { lseek(gif->fd, gif->anim_start, SEEK_SET); }
 
-void
-gd_close_gif(gd_GIF *gif)
-{
+void gd_close_gif(gd_GIF *gif) {
     close(gif->fd);
+    free(gif->canvas);
+    free(gif->frame);
     free(gif);
 }
