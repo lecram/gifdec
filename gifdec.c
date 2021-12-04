@@ -86,7 +86,7 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif) + 4 * width * height);
+    gif = calloc(1, sizeof(*gif));
     if (!gif) goto fail;
     gif->fd = fd;
     gif->width  = width;
@@ -97,8 +97,12 @@ gd_open_gif(const char *fname)
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->canvas = (uint8_t *) &gif[1];
-    gif->frame = &gif->canvas[3 * width * height];
+    gif->frame = calloc(4, width * height);
+    if (!gif->frame) {
+        free(gif);
+        goto fail;
+    }
+    gif->canvas = &gif->frame[width * height];
     if (gif->bgindex)
         memset(gif->frame, gif->bgindex, gif->width * gif->height);
     bgcolor = &gif->palette->colors[gif->bgindex*3];
@@ -109,6 +113,7 @@ gd_open_gif(const char *fname)
     goto ok;
 fail:
     close(fd);
+    return 0;
 ok:
     return gif;
 }
@@ -338,6 +343,9 @@ read_image_data(gd_GIF *gif, int interlace)
 
     read(gif->fd, &byte, 1);
     key_size = (int) byte;
+    if (key_size < 2 || key_size > 8)
+        return -1;
+    
     start = lseek(gif->fd, 0, SEEK_CUR);
     discard_sub_blocks(gif);
     end = lseek(gif->fd, 0, SEEK_CUR);
@@ -408,8 +416,16 @@ read_image(gd_GIF *gif)
     /* Image Descriptor. */
     gif->fx = read_num(gif->fd);
     gif->fy = read_num(gif->fd);
+    
+    if (gif->fx >= gif->width || gif->fy >= gif->height)
+        return -1;
+    
     gif->fw = read_num(gif->fd);
     gif->fh = read_num(gif->fd);
+    
+    gif->fw = MIN(gif->fw, gif->width - gif->fx);
+    gif->fh = MIN(gif->fh, gif->height - gif->fy);
+    
     read(gif->fd, &fisrz, 1);
     interlace = fisrz & 0x40;
     /* Ignore Sort Flag. */
@@ -509,5 +525,6 @@ void
 gd_close_gif(gd_GIF *gif)
 {
     close(gif->fd);
+    free(gif->frame);    
     free(gif);
 }
