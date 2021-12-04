@@ -86,7 +86,7 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif) + 4 * width * height);
+    gif = calloc(1, sizeof(*gif));
     if (!gif) goto fail;
     gif->fd = fd;
     gif->width  = width;
@@ -97,8 +97,12 @@ gd_open_gif(const char *fname)
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->canvas = (uint8_t *) &gif[1];
-    gif->frame = &gif->canvas[3 * width * height];
+    gif->frame = calloc(4, width * height);
+    if (!gif->frame) {
+        free(gif);
+        goto fail;
+    }
+    gif->canvas = &gif->frame[width * height];
     if (gif->bgindex)
         memset(gif->frame, gif->bgindex, gif->width * gif->height);
     bgcolor = &gif->palette->colors[gif->bgindex*3];
@@ -109,6 +113,7 @@ gd_open_gif(const char *fname)
     goto ok;
 fail:
     close(fd);
+    return 0;
 ok:
     return gif;
 }
@@ -509,5 +514,6 @@ void
 gd_close_gif(gd_GIF *gif)
 {
     close(gif->fd);
+    free(gif->frame);    
     free(gif);
 }
