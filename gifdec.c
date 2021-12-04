@@ -413,8 +413,16 @@ read_image(gd_GIF *gif)
     /* Image Descriptor. */
     gif->fx = read_num(gif->fd);
     gif->fy = read_num(gif->fd);
+    
+    if (gif->fx >= gif->width || gif->fy >= gif->height)
+        return -1;
+    
     gif->fw = read_num(gif->fd);
     gif->fh = read_num(gif->fd);
+    
+    gif->fw = MIN(gif->fw, gif->width - gif->fx);
+    gif->fh = MIN(gif->fh, gif->height - gif->fy);
+    
     read(gif->fd, &fisrz, 1);
     interlace = fisrz & 0x40;
     /* Ignore Sort Flag. */
