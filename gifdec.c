@@ -343,6 +343,9 @@ read_image_data(gd_GIF *gif, int interlace)
 
     read(gif->fd, &byte, 1);
     key_size = (int) byte;
+    if (key_size < 2 || key_size > 8)
+        return -1;
+    
     start = lseek(gif->fd, 0, SEEK_CUR);
     discard_sub_blocks(gif);
     end = lseek(gif->fd, 0, SEEK_CUR);
