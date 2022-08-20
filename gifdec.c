@@ -379,6 +379,7 @@ read_image_data(gd_GIF *gif, int interlace)
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
         if (key == clear) continue;
         if (key == stop || key == 0x1000) break;
+        if (key >= table->nentries) break;
         if (ret == 1) key_size++;
         entry = table->entries[key];
         str_len = entry.length;
