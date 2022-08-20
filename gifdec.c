@@ -44,7 +44,7 @@ gd_open_gif(const char *fname)
     uint8_t sigver[3];
     uint16_t width, height, depth;
     uint8_t fdsz, bgidx, aspect;
-    int i;
+    size_t i;
     uint8_t *bgcolor;
     int gct_sz;
     gd_GIF *gif;
@@ -121,11 +121,17 @@ ok:
 static void
 discard_sub_blocks(gd_GIF *gif)
 {
+    uint8_t first_try = 1;
+    uint8_t seek_pos;
     uint8_t size;
 
     do {
         read(gif->fd, &size, 1);
+        if (!first_try && size == seek_pos) //To prevent infinite loop
+            break;
         lseek(gif->fd, size, SEEK_CUR);
+        seek_pos = size;
+        first_try = 0;
     } while (size);
 }
 
@@ -218,7 +224,9 @@ read_ext(gd_GIF *gif)
 {
     uint8_t label;
 
-    read(gif->fd, &label, 1);
+    if(read(gif->fd, &label, 1) < 1)
+        return;
+    
     switch (label) {
     case 0x01:
         read_plain_text_ext(gif);
@@ -333,12 +341,12 @@ static int
 read_image_data(gd_GIF *gif, int interlace)
 {
     uint8_t sub_len, shift, byte;
-    int init_key_size, key_size, table_is_full;
-    int frm_off, frm_size, str_len, i, p, x, y;
+    int init_key_size, key_size, table_is_full = 0;
+    int frm_off, frm_size, str_len = 0, i, p, x, y;
     uint16_t key, clear, stop;
     int ret;
     Table *table;
-    Entry entry;
+    Entry entry = { 0 };
     off_t start, end;
 
     read(gif->fd, &byte, 1);
@@ -379,6 +387,7 @@ read_image_data(gd_GIF *gif, int interlace)
         key = get_key(gif, key_size, &sub_len, &shift, &byte);
         if (key == clear) continue;
         if (key == stop || key == 0x1000) break;
+        if (key >= table->nentries) break;
         if (ret == 1) key_size++;
         entry = table->entries[key];
         str_len = entry.length;
@@ -389,7 +398,7 @@ read_image_data(gd_GIF *gif, int interlace)
             if (interlace)
                 y = interlaced_line_index((int) gif->fh, y);
             gif->frame[(gif->fy + y) * gif->width + gif->fx + x] = entry.suffix;
-            if (entry.prefix == 0xFFF)
+            if (entry.prefix == 0xFFF || entry.prefix >= table->nentries)
                 break;
             else
                 entry = table->entries[entry.prefix];
@@ -495,7 +504,8 @@ gd_get_frame(gd_GIF *gif)
         if (sep == '!')
             read_ext(gif);
         else return -1;
-        read(gif->fd, &sep, 1);
+        if(read(gif->fd, &sep, 1) < 1)
+            return -1;
     }
     if (read_image(gif) == -1)
         return -1;
