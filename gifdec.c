@@ -224,7 +224,8 @@ read_ext(gd_GIF *gif)
 {
     uint8_t label;
 
-    read(gif->fd, &label, 1);
+    if(read(gif->fd, &label, 1) < 1)
+		return;
     switch (label) {
     case 0x01:
         read_plain_text_ext(gif);
@@ -502,7 +503,8 @@ gd_get_frame(gd_GIF *gif)
         if (sep == '!')
             read_ext(gif);
         else return -1;
-        read(gif->fd, &sep, 1);
+        if(read(gif->fd, &sep, 1) < 1)
+			return -1;
     }
     if (read_image(gif) == -1)
         return -1;
