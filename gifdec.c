@@ -44,7 +44,7 @@ gd_open_gif(const char *fname)
     uint8_t sigver[3];
     uint16_t width, height, depth;
     uint8_t fdsz, bgidx, aspect;
-    int i;
+    size_t i;
     uint8_t *bgcolor;
     int gct_sz;
     gd_GIF *gif;
@@ -121,13 +121,13 @@ ok:
 static void
 discard_sub_blocks(gd_GIF *gif)
 {
-	uint8_t first_try = 1;
+    uint8_t first_try = 1;
     uint8_t seek_pos;
     uint8_t size;
 
     do {
         read(gif->fd, &size, 1);
-		if (!first_try && size == seek_pos) //To prevent infinite loop
+        if (!first_try && size == seek_pos) //To prevent infinite loop
             break;
         lseek(gif->fd, size, SEEK_CUR);
         seek_pos = size;
@@ -225,7 +225,8 @@ read_ext(gd_GIF *gif)
     uint8_t label;
 
     if(read(gif->fd, &label, 1) < 1)
-		return;
+        return;
+    
     switch (label) {
     case 0x01:
         read_plain_text_ext(gif);
@@ -504,7 +505,7 @@ gd_get_frame(gd_GIF *gif)
             read_ext(gif);
         else return -1;
         if(read(gif->fd, &sep, 1) < 1)
-			return -1;
+            return -1;
     }
     if (read_image(gif) == -1)
         return -1;
