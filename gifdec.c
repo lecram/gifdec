@@ -121,11 +121,17 @@ ok:
 static void
 discard_sub_blocks(gd_GIF *gif)
 {
+	uint8_t first_try = 1;
+    uint8_t seek_pos;
     uint8_t size;
 
     do {
         read(gif->fd, &size, 1);
+		if (!first_try && size == seek_pos) //To prevent infinite loop
+            break;
         lseek(gif->fd, size, SEEK_CUR);
+        seek_pos = size;
+        first_try = 0;
     } while (size);
 }
 
