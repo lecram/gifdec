@@ -86,7 +86,7 @@ gd_open_gif(const char *fname)
     /* Aspect Ratio */
     read(fd, &aspect, 1);
     /* Create gd_GIF Structure. */
-    gif = calloc(1, sizeof(*gif));
+    gif = (gd_GIF *)calloc(1, sizeof(*gif));
     if (!gif) goto fail;
     gif->fd = fd;
     gif->width  = width;
@@ -97,7 +97,7 @@ gd_open_gif(const char *fname)
     read(fd, gif->gct.colors, 3 * gif->gct.size);
     gif->palette = &gif->gct;
     gif->bgindex = bgidx;
-    gif->frame = calloc(4, width * height);
+    gif->frame = (uint8_t *)calloc(4, width * height);
     if (!gif->frame) {
         free(gif);
         goto fail;
@@ -240,9 +240,9 @@ read_ext(gd_GIF *gif)
 static Table *
 new_table(int key_size)
 {
-    int key;
+    u_int8_t key;
     int init_bulk = MAX(1 << (key_size + 1), 0x100);
-    Table *table = malloc(sizeof(*table) + sizeof(Entry) * init_bulk);
+    Table *table = (Table *)malloc(sizeof(*table) + sizeof(Entry) * init_bulk);
     if (table) {
         table->bulk = init_bulk;
         table->nentries = (1 << key_size) + 2;
@@ -263,7 +263,7 @@ add_entry(Table **tablep, uint16_t length, uint16_t prefix, uint8_t suffix)
     Table *table = *tablep;
     if (table->nentries == table->bulk) {
         table->bulk *= 2;
-        table = realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
+        table = (Table *)realloc(table, sizeof(*table) + sizeof(Entry) * table->bulk);
         if (!table) return -1;
         table->entries = (Entry *) &table[1];
         *tablep = table;
@@ -333,8 +333,8 @@ static int
 read_image_data(gd_GIF *gif, int interlace)
 {
     uint8_t sub_len, shift, byte;
-    int init_key_size, key_size, table_is_full;
-    int frm_off, frm_size, str_len, i, p, x, y;
+    int init_key_size, key_size, table_is_full = 0;
+    int frm_off, frm_size, str_len = 0, i, p, x, y;
     uint16_t key, clear, stop;
     int ret;
     Table *table;
@@ -345,7 +345,7 @@ read_image_data(gd_GIF *gif, int interlace)
     key_size = (int) byte;
     if (key_size < 2 || key_size > 8)
         return -1;
-    
+
     start = lseek(gif->fd, 0, SEEK_CUR);
     discard_sub_blocks(gif);
     end = lseek(gif->fd, 0, SEEK_CUR);
@@ -416,16 +416,16 @@ read_image(gd_GIF *gif)
     /* Image Descriptor. */
     gif->fx = read_num(gif->fd);
     gif->fy = read_num(gif->fd);
-    
+
     if (gif->fx >= gif->width || gif->fy >= gif->height)
         return -1;
-    
+
     gif->fw = read_num(gif->fd);
     gif->fh = read_num(gif->fd);
-    
+
     gif->fw = MIN(gif->fw, gif->width - gif->fx);
     gif->fh = MIN(gif->fh, gif->height - gif->fy);
-    
+
     read(gif->fd, &fisrz, 1);
     interlace = fisrz & 0x40;
     /* Ignore Sort Flag. */
@@ -525,6 +525,6 @@ void
 gd_close_gif(gd_GIF *gif)
 {
     close(gif->fd);
-    free(gif->frame);    
+    free(gif->frame);
     free(gif);
 }
